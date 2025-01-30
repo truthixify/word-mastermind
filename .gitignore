@@ -1,0 +1,10 @@
+**/node_modules
+**/artifacts
+**/cache
+**/circuits/circuit_0000.zkey
+**/circuits/circuit_final.zkey
+**/circuits/WordMastermind.r1cs
+**/circuits/WordMastermind.sym
+**/circuits/WordMastermind_js
+**/circuits/verification_key.json
+**/*.ptau
