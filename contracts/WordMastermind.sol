@@ -23,14 +23,16 @@ contract WordMastermind is Groth16Verifier {
     uint8 constant public MAX_ROUND = 10;
     uint8 public currentRound = 1;
     address public player;
+    address public owner;
     mapping (address => uint256) solutionHashes;
 
     IHasher public hasher;
     IVerifier public verifier;
 
-    constructor(IVerifier _verifier, IHasher _hasher) {
+    constructor(IVerifier _verifier, IHasher _hasher, address _owner) {
         verifier = _verifier;
         hasher = _hasher;
+        owner = _owner;
     }
 
     enum Result {
@@ -43,7 +45,7 @@ contract WordMastermind is Groth16Verifier {
         Register,
         CommitSolutionHash,
         Playing,
-        Reveal
+        Reveal 
     }
     Stages public stage = Stages.Register;
 
@@ -88,6 +90,7 @@ contract WordMastermind is Groth16Verifier {
     event RoundChange(uint8 round);
     event Register(address indexed player);
     event CommitSolutionHash(address indexed player, uint256 solutionHash);
+    event Reveal(address indexed player, uint8 a, uint8 b, uint8 c, uint8 d);
     event GameFinish(Result indexed result);
     event Initialize();
 
@@ -139,26 +142,24 @@ contract WordMastermind is Groth16Verifier {
     }
 
     function register() public atStage(Stages.Register) {
-        if (player == address(0)) {
-            player = msg.sender;
-            emit Register(msg.sender);
-        } else {
-            require(player != msg.sender, "already registerd!");
-            player = msg.sender;
-            stage = Stages.CommitSolutionHash;
-            emit Register(msg.sender);
-            emit StageChange(Stages.CommitSolutionHash);
-        }
+        require(player != msg.sender, "already registerd!");
+
+        player = msg.sender;
+        stage = Stages.CommitSolutionHash;
+
+        emit Register(msg.sender);
+        emit StageChange(Stages.CommitSolutionHash);
     }
 
     function commitSolutionHash(uint256 solutionHash)
         public
         atStage(Stages.CommitSolutionHash)
     {
+        require(owner == msg.sender, "not allowed!");
         solutionHashes[msg.sender] = solutionHash;
         emit CommitSolutionHash(msg.sender, solutionHash);
 
-        if (solutionHashes[player] != 0) {
+        if (solutionHashes[owner] != 0) {
             stage = Stages.Playing;
             emit StageChange(Stages.Playing);
         }
@@ -186,6 +187,8 @@ contract WordMastermind is Groth16Verifier {
             guess3,
             guess4
         );
+
+        currentRound++;
     }
 
     function submitBcProof(
@@ -205,12 +208,39 @@ contract WordMastermind is Groth16Verifier {
 
         if (bull == 4) {
             emit GameFinish(Result.Win);
+
             result = Result.Win;
+            stage = Stages.Reveal;
         } else {
-            emit GameFinish(Result.Lose);
-            result = Result.Lose;
+            if (currentRound == MAX_ROUND) {
+                emit GameFinish(Result.Lose);
+
+                result = Result.Lose;
+                stage = Stages.Reveal;
+            }
         }
 
         emit SubmitBC(msg.sender, currentRound, bull, cow);
+    }
+
+    function reveal(
+        uint256 salt,
+        uint8 a,
+        uint8 b,
+        uint8 c,
+        uint8 d
+    ) public atStage(Stages.Reveal) {
+        // Check the hash to ensure the solution is correct
+        require(
+            hasher.poseidon([salt, a, b, c, d]) == solutionHashes[msg.sender],
+            "invalid hash"
+        );
+
+        emit Reveal(msg.sender, a, b, c, d);
+
+        if (result == Result.Win) {
+            initGameState();
+            emit GameFinish(Result.Win);
+        }
     }
 }

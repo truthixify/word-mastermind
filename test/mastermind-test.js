@@ -1,46 +1,119 @@
-const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
-const { groth16 } = require("snarkjs");
+const { expect } = require("chai");
+const {
+  calculateBC,
+  deploy,
+  deployPoseidon,
+  generateProof,
+} = require("./utils");
+const buildPoseidon = require("circomlibjs").buildPoseidon;
 
-const wasm_tester = require("circom_tester").wasm;
+describe("Word Mastermind", function () {
+  let WordMastermind;
+  let poseidonJs;
 
-const F1Field = require("ffjavascript").F1Field;
-const Scalar = require("ffjavascript").Scalar;
-exports.p = Scalar.fromString(
-  "21888242871839275222246405745257275088548364400416034343698204186575808495617",
-);
-const Fr = new F1Field(exports.p);
+  let owner;
+  let player;
 
-describe("Mastermind Variation circuit test", function () {
-  this.timeout(100000000);
+  before(async () => {
+    [owner, player] = await ethers.getSigners();
+    const poseidonContract = await deployPoseidon(owner);
+    const verifier = await deploy("Groth16Verifier");
 
-  it("Circuit test", async () => {
-    const circuit = await wasm_tester(
-      "contracts/circuits/MastermindVariation.circom",
+    WordMastermind = await deploy(
+      "WordMastermind",
+      verifier.address,
+      poseidonContract.address,
+      owner.address
     );
 
-    const INPUT = {
-      pubGuess: ["70", "82", "69", "84"],
-      privSalt: "1234",
-      pubNumBull: "4",
-      pubNumCow: "0",
-      pubSolnHash:
-        "1565709258951795423637241887950612550910289139104993260018598934344803482919",
-      privSoln: ["70", "82", "69", "84"],
+    poseidonJs = await buildPoseidon();
+  });
+
+  it("fetch", async function () {
+    const submittedGuess = await WordMastermind.connect(
+      player
+    ).getSubmittedGuess();
+    expect(submittedGuess[0].submitted).to.equal(false);
+
+    const submittedBC = await WordMastermind.connect(player).getSubmittedBC();
+    expect(submittedBC[0].submitted).to.equal(false);
+  });
+
+  it("play game!", async function () {
+    // register
+    await WordMastermind.connect(player).register();
+
+    // Solution & SolutionHash
+    const solution = [65, 66, 67, 68];
+    const salt = ethers.BigNumber.from(ethers.utils.randomBytes(32));
+    const solutionHash = ethers.BigNumber.from(
+      poseidonJs.F.toObject(poseidonJs([salt, ...solution]))
+    );
+
+    // Commit SolutionHash
+    expect(
+      await WordMastermind.connect(owner).commitSolutionHash(solutionHash)
+    );
+
+    // Player submits guess
+    const guess = [80, 70, 90, 81];
+    await expect(WordMastermind.connect(player).submitGuess(...guess))
+      .to.emit(WordMastermind, "SubmitGuess")
+      .withArgs(player.address, 1, ...guess);
+
+    const [hit, blow] = calculateBC(guess, solution);
+
+    const proofInput = {
+      pubGuess: guess,
+      pubNumBull: hit,
+      pubNumCow: blow,
+      pubSolnHash: solutionHash.toString(),
+      privSoln: solution,
+      privSalt: salt.toString(),
     };
 
-    const witness = await circuit.calculateWitness(INPUT, true);
+    // Generate proof at local
+    const proof = await generateProof(proofInput);
 
-    // console.log(witness);
+    // Submit proof and verify proof in SmartContract.
+    await WordMastermind.connect(player).submitBcProof(...proof);
 
-    assert(Fr.eq(Fr.e(witness[0]), Fr.e(1)));
-    assert(
-      Fr.eq(
-        Fr.e(witness[1]),
-        Fr.e(
-          "1565709258951795423637241887950612550910289139104993260018598934344803482919",
-        ),
-      ),
-    );
+    // Player submits correct guess.
+    const allHitGuess = solution;
+    await WordMastermind.connect(player).submitGuess(...allHitGuess);
+
+    // It must be 4 hits and 0 blow.
+    const [bull4, cow0] = calculateBC(allHitGuess, solution);
+
+    const proofInputHitAll = {
+      pubGuess: solution,
+      pubNumBull: bull4,
+      pubNumCow: cow0,
+      pubSolnHash: solutionHash.toString(),
+      privSoln: solution,
+      privSalt: salt.toString(),
+    };
+
+    // Player Win! (leave drawn game out of consideration...)
+    const proofHitAll = await generateProof(proofInputHitAll);
+    expect(await WordMastermind.connect(player).submitBcProof(...proofHitAll))
+      .to.emit(WordMastermind, "SubmitHB")
+      .withArgs(player.address, 2, ...[bull4, cow0]);
+
+    expect(await WordMastermind.connect(owner).reveal(salt, ...solution))
+      .to.emit(WordMastermind, "Reveal")
+      .withArgs(owner.address, ...solution)
+      .to.emit(WordMastermind, "GameFinish")
+      .withArgs();
+
+    // Initialize
+    expect(await WordMastermind.stage()).to.equal(0);
+    expect(
+      (await WordMastermind.submittedGuess(0, player.address)).submitted
+    ).to.equal(false);
+    expect(
+      (await WordMastermind.submittedBC(0, player.address)).submitted
+    ).to.equal(false);
   });
 });
