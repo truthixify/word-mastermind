@@ -5,7 +5,7 @@ const {
   deploy,
   deployPoseidon,
   generateProof,
-} = require("./utils");
+} = require("../utils/utils");
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 
 describe("Word Mastermind", function () {
