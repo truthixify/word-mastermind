@@ -1,34 +1,41 @@
 const { poseidonContract } = require("circomlibjs");
+const { ethers } = require("hardhat");
 
-async function main() {
-  // Fetch the deployer's account (the first account provided by Hardhat's local node)
-  const [deployer] = await ethers.getSigners();
-
-  console.log("Deploying contracts with the account:", deployer.address);
-
-  const PoseidonT3 = await ethers.getContractFactory(
-    poseidonContract.generateABI(2),
-    poseidonContract.createCode(2)
-  );
-  const poseidonT3 = await PoseidonT3.deploy();
-  await poseidonT3.deployed();
-
-  const MerkleTree = await ethers.getContractFactory("MerkleTree", {
-    libraries: {
-      PoseidonT3: poseidonT3.address,
-    },
-  });
-
-  // Get the contract factory and deploy the contract
-  const merkleTree = await MerkleTree.deploy();
-  await merkleTree.deployed();
-
-  console.log("Contract deployed to:", merkleTree.address);
+async function deploy(contractName, ...args) {
+  const Factory = await ethers.getContractFactory(contractName);
+  const instance = await Factory.deploy(...args);
+  return instance.deployed();
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+async function deployPoseidon(signer) {
+  const Factory = new ethers.ContractFactory(
+    poseidonContract.generateABI(5),
+    poseidonContract.createCode(5),
+    signer
+  );
+  const instance = await Factory.deploy();
+  return instance.deployed();
+}
+async function main() {
+  const [owner] = await ethers.getSigners();
+  const poseidonContract = await deployPoseidon(owner);
+  const verifier = await deploy("Groth16Verifier");
+  const WordMastermind = await deploy(
+    "WordMastermind",
+    verifier.address,
+    poseidonContract.address,
+  );
+
+  console.log("poseidon deployed to:", poseidonContract.address);
+  console.log("verifier deployed to:", verifier.address);
+  console.log("WordMastermind deployed to:", WordMastermind.address);
+}
+
+// poseidon deployed to: 0x786b3E4a852b7B80850ED379BF1F675ADD2032Da
+// verifier deployed to: 0xB93726DE07BA4E5356928E33A7239fece0dd0b9E
+// WordMastermind deployed to: 0x41B2BbDe2BFE6b7f551Acf6d5aC41ff86019D29a
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

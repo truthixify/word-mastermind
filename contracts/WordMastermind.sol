@@ -23,16 +23,14 @@ contract WordMastermind is Groth16Verifier {
     uint8 constant public MAX_ROUND = 10;
     uint8 public currentRound = 1;
     address public player;
-    address public owner;
     mapping (address => uint256) solutionHashes;
 
     IHasher public hasher;
     IVerifier public verifier;
 
-    constructor(IVerifier _verifier, IHasher _hasher, address _owner) {
+    constructor(IVerifier _verifier, IHasher _hasher) {
         verifier = _verifier;
         hasher = _hasher;
-        owner = _owner;
     }
 
     enum Result {
@@ -155,11 +153,10 @@ contract WordMastermind is Groth16Verifier {
         public
         atStage(Stages.CommitSolutionHash)
     {
-        require(owner == msg.sender, "not allowed!");
         solutionHashes[msg.sender] = solutionHash;
         emit CommitSolutionHash(msg.sender, solutionHash);
 
-        if (solutionHashes[owner] != 0) {
+        if (solutionHashes[msg.sender] != 0) {
             stage = Stages.Playing;
             emit StageChange(Stages.Playing);
         }

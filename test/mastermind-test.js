@@ -24,7 +24,6 @@ describe("Word Mastermind", function () {
       "WordMastermind",
       verifier.address,
       poseidonContract.address,
-      owner.address
     );
 
     poseidonJs = await buildPoseidon();
@@ -53,7 +52,7 @@ describe("Word Mastermind", function () {
 
     // Commit SolutionHash
     expect(
-      await WordMastermind.connect(owner).commitSolutionHash(solutionHash)
+      await WordMastermind.commitSolutionHash(solutionHash)
     );
 
     // Player submits guess

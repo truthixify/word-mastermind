@@ -8,3 +8,4 @@
 **/circuits/WordMastermind_js
 **/circuits/verification_key.json
 **/*.ptau
+.env
