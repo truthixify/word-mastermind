@@ -25,7 +25,7 @@ function App() {
               alert(`Error loading contract: ${error}`);
             }
         } else {
-        alert("No Ethereum provider found. Install MetaMask.");
+            alert("No Ethereum provider found. Install MetaMask.");
         }
     };
 

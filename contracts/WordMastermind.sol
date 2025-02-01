@@ -93,10 +93,6 @@ contract WordMastermind is Groth16Verifier {
     event Initialize();
 
     function initialize() public {
-        require(
-            msg.sender == player,
-            "not allowed"
-        );
         initGameState();
     }
 

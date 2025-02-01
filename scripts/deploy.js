@@ -31,9 +31,9 @@ async function main() {
   console.log("WordMastermind deployed to:", WordMastermind.address);
 }
 
-// poseidon deployed to: 0xE82F48Ec92d4050d99c8C7d4bF900E8315DEbB2f
-// verifier deployed to: 0x37Be8C585f8fF709BEdD18e5ed074E7CDb75b219
-// WordMastermind deployed to: 0x4E6377Ce77ce89056dDA4a989Ba6c40d4EF2356f
+// poseidon deployed to: 0xF09e8Dcf61DD1d7B9d3656B621eF977Cd3919696
+// verifier deployed to: 0x6B8742d5f2111396454ba607EeC2ed98d899e082
+// WordMastermind deployed to: 0x56f74D82C008653ac0caC9722c69bab09EC2cF49
 
 main().catch((error) => {
   console.error(error);
