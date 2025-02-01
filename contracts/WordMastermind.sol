@@ -140,7 +140,9 @@ contract WordMastermind is Groth16Verifier {
     }
 
     function register() public atStage(Stages.Register) {
-        require(player != msg.sender, "already registerd!");
+        if (player == msg.sender) {
+            revert("already registered!");
+        }
 
         player = msg.sender;
         stage = Stages.CommitSolutionHash;

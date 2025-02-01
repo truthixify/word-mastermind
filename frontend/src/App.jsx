@@ -32,7 +32,7 @@ function App() {
     return (
         <>
         <Navbar handleConnectWallet={ handleConnectWallet } account={ account } />
-        <Main contract={ contract }/>
+        <Main contract={ contract } account={ account }/>
         </>
     );
 }
